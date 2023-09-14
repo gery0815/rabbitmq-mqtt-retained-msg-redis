@@ -1,0 +1,34 @@
+%% ----------------------------------------------------------------------------
+%% RabbitMQ MQTT Adapter
+%%
+%% See https://github.com/rabbitmq/rabbitmq-mqtt/blob/stable/README.md
+%% for details
+%% ----------------------------------------------------------------------------
+
+%  {rabbitmq_mqtt,
+%   [%% Set the default user name and password. Will be used as the default login
+%% if a connecting client provides no other login details.
+%%
+%% Please note that setting this will allow clients to connect without
+%% authenticating!
+%%
+%% {default_user, <<"guest">>},
+%% {default_pass, <<"guest">>},
+
+
+{mapping, "mqtt.redis_msg_ttl", "rabbitmq_mqtt.redis_msg_ttl", [
+    {datatype, integer}
+]}.
+
+{mapping, "mqtt.redis_url", "rabbitmq_mqtt.redis_url", [
+    {datatype, string}
+]}.
+
+{mapping, "mqtt.redis_port", "rabbitmq_mqtt.redis_port", [
+    {datatype, integer}
+]}.
+
+{mapping, "mqtt.redis_database", "rabbitmq_mqtt.redis_database", [
+    {datatype, integer}
+]}.
+
