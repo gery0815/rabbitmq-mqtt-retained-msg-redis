@@ -14,17 +14,25 @@
 
 -type store_state() :: #store_state{}.
 
+-spec retained_key_hash() -> binary().
+retained_key_hash() ->
+    "retained".
+
+-spec retained_key(binary(), store_state()) -> binary().
+% default => retained_key() -> Prefix ++ "/" ++ Topic,
+retained_key(Topic, #store_state{key_prefix = Prefix}) ->
+    retained_key_hash() ++ ":" ++ uri_string:quote(Prefix ++ "/" ++ Topic).
+
 -spec new(file:name_all(), rabbit_types:vhost()) -> store_state().
 new(_, VHost) -> connect_to_redis(VHost).
 
-
 -spec recover(file:name_all(), rabbit_types:vhost()) ->
-  {error, uninitialized} | {ok, store_state()}.
+    {error, uninitialized} | {ok, store_state()}.
 recover(_, VHost) -> connect_to_redis(VHost).
 
 -spec insert(binary(), mqtt_msg(), store_state()) -> ok.
 insert(Topic, Message, #store_state{redis_client = Client, key_prefix = Prefix}) ->
-    Key = Prefix ++ "/" ++ Topic,
+    Key = retained_key(Topic, #store_state{key_prefix = Prefix}),
     {ok, RedisEnvTTL} = application:get_env(redis_msg_ttl),
     ?LOG_DEBUG("Inserting message ~p to Redis in key ~p TTL: ~p ...", [
         Message, Key, RedisEnvTTL
@@ -44,23 +52,29 @@ insert(Topic, Message, #store_state{redis_client = Client, key_prefix = Prefix})
 -spec lookup(binary(), store_state()) ->
     mqtt_msg() | undefined.
 lookup(Topic, #store_state{redis_client = Client, key_prefix = Prefix}) ->
-    Key = Prefix ++ "/" ++ Topic,
+    Key = retained_key(Topic, #store_state{key_prefix = Prefix}),
     ?LOG_DEBUG("Getting message from Redis in key ~p...", [Key]),
     case catch (eredis:q(Client, ["GET", Key])) of
-        {ok, undefined} -> undefined;
-        {ok, Message} -> binary_to_term(Message);
-        {error, Reason} -> ?LOG_ERROR("Error while reading redis key. Error message: ~p", [Reason]), undefined;
-        {'EXIT', {timeout, _}} -> ?LOG_ERROR("Timeout while reading message"), undefined
+        {ok, undefined} ->
+            undefined;
+        {ok, Message} ->
+            binary_to_term(Message);
+        {error, Reason} ->
+            ?LOG_ERROR("Error while reading redis key. Error message: ~p", [Reason]),
+            undefined;
+        {'EXIT', {timeout, _}} ->
+            ?LOG_ERROR("Timeout while reading message"),
+            undefined
     end.
 
 -spec delete(binary(), store_state()) -> ok.
 delete(Topic, #store_state{redis_client = Client, key_prefix = Prefix}) ->
-    Key = Prefix ++ "/" ++ Topic,
+    Key = retained_key(Topic, #store_state{key_prefix = Prefix}),
     {ok, ok} = eredis:q(Client, ["DEL", Key]).
 
 -spec terminate(store_state()) -> ok.
-terminate(#store_state{}) ->
-    {ok, ok}.
+terminate(#store_state{redis_client = Client}) ->
+    ok = eredis:stop(Client).
 
 connect_to_redis(VHost) ->
     {ok, RedisHost} = application:get_env(redis_host),
@@ -72,10 +86,15 @@ connect_to_redis(VHost) ->
             RedisHost, RedisPort, RedisDatabase, VHost, RedisTTL
         ]
     ),
-    Options = [{host, RedisHost}, {port, RedisPort}, {database, RedisDatabase}]
-    ,
+    Options = [{host, RedisHost}, {port, RedisPort}, {database, RedisDatabase}],
+
     case eredis:start_link(Options) of
         {ok, Client} ->
+            ?LOG_DEBUG(
+                "Prefix: ~p for VHost: ~p", [
+                    binary_to_list(VHost), VHost
+                ]
+            ),
             {ok, #store_state{redis_client = Client, key_prefix = binary_to_list(VHost)}};
         {error, Reason} ->
             {error, Reason}
