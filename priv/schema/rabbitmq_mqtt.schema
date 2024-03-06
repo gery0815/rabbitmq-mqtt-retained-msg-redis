@@ -20,7 +20,7 @@
     {datatype, integer}
 ]}.
 
-{mapping, "mqtt.redis_url", "rabbitmq_mqtt.redis_url", [
+{mapping, "mqtt.redis_host", "rabbitmq_mqtt.redis_host", [
     {datatype, string}
 ]}.
 
@@ -31,4 +31,3 @@
 {mapping, "mqtt.redis_database", "rabbitmq_mqtt.redis_database", [
     {datatype, integer}
 ]}.
-

@@ -63,16 +63,16 @@ terminate(#store_state{}) ->
     {ok, ok}.
 
 connect_to_redis(VHost) ->
-    {ok, RedisUrl} = application:get_env(redis_url),
+    {ok, RedisHost} = application:get_env(redis_host),
     {ok, RedisPort} = application:get_env(redis_port),
     {ok, RedisDatabase} = application:get_env(redis_database),
     {ok, RedisTTL} = application:get_env(redis_msg_ttl),
     ?LOG_INFO(
         "Connecting to ~p : ~p on database: ~p for VHost: ~p TTL: ~p...", [
-            RedisUrl, RedisPort, RedisDatabase, VHost, RedisTTL
+            RedisHost, RedisPort, RedisDatabase, VHost, RedisTTL
         ]
     ),
-    Options = [{host, RedisUrl}, {port, RedisPort}, {database, RedisDatabase}]
+    Options = [{host, RedisHost}, {port, RedisPort}, {database, RedisDatabase}]
     ,
     case eredis:start_link(Options) of
         {ok, Client} ->
