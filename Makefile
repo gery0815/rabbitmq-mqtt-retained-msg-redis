@@ -8,10 +8,10 @@ define PROJECT_ENV
 		{redis_port, 6379},
 		{redis_database, 5},
 		{redis_msg_ttl, 1209600}
-	  ]
+]
 endef
 
-DEPS = rabbit_common rabbit amqp_client rabbitmq_mqtt eredis
+DEPS = rabbit_common rabbit amqp_client rabbitmq_mqtt eredis msgpack jsx
 TEST_DEPS = rabbitmq_ct_helpers rabbitmq_ct_client_helpers
 
 DEP_EARLY_PLUGINS = rabbit_common/mk/rabbitmq-early-plugin.mk
