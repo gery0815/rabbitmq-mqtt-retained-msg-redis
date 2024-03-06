@@ -86,7 +86,8 @@ mqtt_msg_record_to_map(#mqtt_msg{
 
 -spec encode_message(mqtt_msg_v0() | mqtt_msg()) -> binary().
 encode_message(Message) ->
-    jsx:encode(convert_to_map(Message)).
+    % jsx:encode(convert_to_map(Message)).
+    msgpack:pack(convert_to_map(Message), [{map_format, jsx}]).
 
 -spec json_to_mqtt_msg_v0(map()) -> mqtt_msg_v0().
 json_to_mqtt_msg_v0(Map) ->
@@ -116,10 +117,18 @@ json_to_mqtt_msg(Map) ->
         timestamp = maps:get(timestamp, Map, none)
     }.
 
--spec decode_message(binary()) -> mqtt_msg().
+-spec decode_message(binary()) -> mqtt_msg() | mqtt_msg_v0().
 decode_message(Pack) ->
     % Ensure maps are returned
-    DecodedMap = jsx:decode(Pack, [{return_maps, true}]),
+    % DecodedMap = jsx:decode(Pack, [{return_maps, true}]),
+    DecodedMap =
+        case catch (msgpack:unpack(Pack, [{map_format, jsx}])) of
+            {ok, Message} ->
+                Message;
+            {error, Reason} ->
+                ?LOG_ERROR("Error while decoding message. Error message: ~p", [Reason]),
+                undefined
+        end,
     Packet =
         case maps:get(recordName, DecodedMap, undefined) of
             % No recordName implies #mqtt_msg{}
@@ -140,9 +149,7 @@ insert(Topic, Message, #store_state{redis_client = Client, key_prefix = Prefix})
     Key = retained_key(Topic, #store_state{key_prefix = Prefix}),
     {ok, RedisEnvTTL} = application:get_env(redis_msg_ttl),
     Pack = encode_message(Message),
-    ?LOG_DEBUG("Inserting message to Redis in key ~p TTL: ~p ...", [
-        Key, RedisEnvTTL
-    ]),
+    ?LOG_DEBUG("Inserting message to Redis in key ~p TTL: ~p, message: ~p", [Key, RedisEnvTTL, Pack]),
     case catch (eredis:q(Client, ["SET", Key, Pack])) of
         {ok, _} ->
             eredis:q(Client, [
@@ -156,7 +163,7 @@ insert(Topic, Message, #store_state{redis_client = Client, key_prefix = Prefix})
     end.
 
 -spec lookup(binary(), store_state()) ->
-    mqtt_msg() | undefined.
+    mqtt_msg_v0() | mqtt_msg() | undefined.
 lookup(Topic, #store_state{redis_client = Client, key_prefix = Prefix}) ->
     Key = retained_key(Topic, #store_state{key_prefix = Prefix}),
     ?LOG_DEBUG("Getting message from Redis in key ~p...", [Key]),
@@ -164,7 +171,9 @@ lookup(Topic, #store_state{redis_client = Client, key_prefix = Prefix}) ->
         {ok, undefined} ->
             undefined;
         {ok, Pack} ->
-            decode_message(Pack);
+            Packet = decode_message(Pack),
+            ?LOG_DEBUG("Found message in Redis in key ~p: ~p", [Key, Packet]),
+            Packet;
         {error, Reason} ->
             ?LOG_ERROR("Error while reading redis key. Error message: ~p", [Reason]),
             undefined;
