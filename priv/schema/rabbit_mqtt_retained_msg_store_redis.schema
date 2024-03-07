@@ -1,0 +1,15 @@
+{mapping, "mqtt.redis_msg_ttl", "rabbitmq_mqtt.redis_msg_ttl", [
+    {datatype, integer}
+]}.
+
+{mapping, "mqtt.redis_host", "rabbitmq_mqtt.redis_host", [
+    {datatype, string}
+]}.
+
+{mapping, "mqtt.redis_port", "rabbitmq_mqtt.redis_port", [
+    {datatype, integer}
+]}.
+
+{mapping, "mqtt.redis_database", "rabbitmq_mqtt.redis_database", [
+    {datatype, integer}
+]}.
